@@ -1,0 +1,6 @@
+{
+  "name": "Wallora - Fondos de Pantalla & Packs",
+  "description": "Plataforma minimalista para explorar y descargar fondos de pantalla en alta resolución y armar packs personalizados.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
