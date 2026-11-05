@@ -1,20 +1,35 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+# Wallora - Plataforma de Fondos de Pantalla & Pre-Packs
 
-# Run and deploy your AI Studio app
+Plataforma moderna y minimalista para explorar y descargar fondos de pantalla en alta definición (4K UHD, 8K y móviles) y agruparlos en packs personalizados (.ZIP).
 
-This contains everything you need to run your app locally.
+## 🚀 Tecnologías
+- **React 19** + **TypeScript**
+- **Vite 8** (con `base: './'` listo para GitHub Pages)
+- **Tailwind CSS v4** (tema oscuro y claro)
+- **JSZip** (empaquetado y compresión de packs en tiempo real)
+- **Lucide Icons**
 
-View your app in AI Studio: https://ai.studio/apps/89e52b5c-a586-4536-a489-de3dd2186d1e
+## 📦 Cómo ejecutar localmente
 
-## Run Locally
+1. Clona o pega los archivos en tu carpeta del proyecto.
+2. Instala las dependencias:
+   ```bash
+   npm install
+   ```
+3. Inicia el servidor de desarrollo:
+   ```bash
+   npm run dev
+   ```
+4. Abre tu navegador en `http://localhost:3000`.
 
-**Prerequisites:**  Node.js
+## 🌐 Cómo desplegar en GitHub Pages
 
-
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+1. Sube los archivos a tu repositorio en GitHub:
+   ```bash
+   git add .
+   git commit -m "feat: nuevo diseño minimalista y creador de packs"
+   git push origin main
+   ```
+2. En GitHub, ve a **Settings** -> **Pages**.
+3. En **Build and deployment -> Source**, selecciona **GitHub Actions**.
+4. El archivo `.github/workflows/deploy.yml` compilará y publicará tu sitio automáticamente en `https://pascual3123.github.io/wallora/`.
