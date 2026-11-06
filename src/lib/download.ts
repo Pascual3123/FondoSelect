@@ -9,7 +9,70 @@ function saveBlob(blob: Blob, name: string) {
   document.body.appendChild(link)
   link.click()
   link.remove()
-  setTimeout(() => URL.revokeObjectURL(url), 30_000)
+  window.setTimeout(() => URL.revokeObjectURL(url), 30_000)
+}
+
+export type WallpaperResolution = 'original' | '4k' | '2k' | 'fhd' | 'mobile'
+
+const resolutionBounds: Record<Exclude<WallpaperResolution, 'original'>, [number, number]> = {
+  '4k': [3840, 2160],
+  '2k': [2560, 1440],
+  fhd: [1920, 1080],
+  mobile: [1440, 2560],
+}
+
+export async function downloadWallpaper(
+  wallpaper: Wallpaper,
+  resolution: WallpaperResolution = 'original',
+) {
+  const response = await fetch(wallpaper.url)
+  if (!response.ok) {
+    throw new Error(`No se pudo descargar ${wallpaper.title} (${response.status}).`)
+  }
+  const source = await response.blob()
+
+  if (resolution === 'original') {
+    saveBlob(source, wallpaper.path.split('/').pop() || 'wallpaper')
+    return
+  }
+
+  const bitmap = await createImageBitmap(source)
+  const [maxWidth, maxHeight] = resolutionBounds[resolution]
+  const scale = Math.min(maxWidth / bitmap.width, maxHeight / bitmap.height, 1)
+  if (scale === 1) {
+    bitmap.close()
+    saveBlob(source, wallpaper.path.split('/').pop() || 'wallpaper')
+    return
+  }
+
+  const canvas = document.createElement('canvas')
+  canvas.width = Math.max(1, Math.round(bitmap.width * scale))
+  canvas.height = Math.max(1, Math.round(bitmap.height * scale))
+  const context = canvas.getContext('2d')
+  if (!context) {
+    bitmap.close()
+    throw new Error('El navegador no pudo preparar la imagen para esta resolución.')
+  }
+  context.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
+  bitmap.close()
+
+  const mimeType = ['image/jpeg', 'image/png', 'image/webp'].includes(source.type)
+    ? source.type
+    : 'image/jpeg'
+  const resized = await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(
+      blob => blob
+        ? resolve(blob)
+        : reject(new Error('El navegador no pudo convertir la imagen.')),
+      mimeType,
+      mimeType === 'image/jpeg' || mimeType === 'image/webp' ? 0.94 : undefined,
+    )
+  })
+  const originalName = wallpaper.path.split('/').pop() || 'wallpaper'
+  const extension = originalName.includes('.') ? originalName.slice(originalName.lastIndexOf('.')) : '.jpg'
+  const baseName = originalName.includes('.') ? originalName.slice(0, originalName.lastIndexOf('.')) : originalName
+  const outputExtension = mimeType === 'image/jpeg' ? '.jpg' : mimeType === 'image/png' ? '.png' : '.webp'
+  saveBlob(resized, `${baseName}-${resolution}${extension.toLowerCase() === outputExtension ? extension : outputExtension}`)
 }
 
 export async function downloadPack(

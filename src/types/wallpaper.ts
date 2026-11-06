@@ -5,4 +5,6 @@ export interface Wallpaper {
   path: string
   url: string
   size?: number
+  width?: number
+  height?: number
 }
