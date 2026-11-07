@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   ArrowDownWideNarrow,
   ArrowUpDown,
@@ -20,9 +20,13 @@ import {
 } from 'lucide-react'
 import PackBuilder from './components/PackBuilder'
 import WallpaperCard from './components/WallpaperCard'
+import AuthDialog from './components/AuthDialog'
+import DownloadGate from './components/DownloadGate'
 import { useWallpapers } from './hooks/useWallpapers'
 import { downloadPack, downloadWallpaper, type WallpaperResolution } from './lib/download'
+import { supabase } from './lib/supabase'
 import type { Wallpaper } from './types/wallpaper'
+import type { User } from '@supabase/supabase-js'
 
 type Preset = {
   name: string
@@ -103,7 +107,7 @@ export default function App() {
   const [likes, setLikes] = useState<Record<string, number>>({})
   const [downloads, setDownloads] = useState<Record<string, number>>({})
   const [dimensions, setDimensions] = useState<Record<string, { width: number; height: number }>>({})
-  const [packName, setPackName] = useState('Mi Colección Wallora')
+  const [packName, setPackName] = useState('Mi Colección FondoSelect')
   const [progress, setProgress] = useState<{ percent: number; message: string } | null>(null)
   const [notice, setNotice] = useState('')
   const [noticeError, setNoticeError] = useState(false)
@@ -111,6 +115,98 @@ export default function App() {
   const [mobileMenu, setMobileMenu] = useState(false)
   const [copied, setCopied] = useState('')
   const [resolution, setResolution] = useState<WallpaperResolution>('original')
+  const [user, setUser] = useState<User | null>(null)
+  const [isPremium, setIsPremium] = useState(false)
+  const [authOpen, setAuthOpen] = useState(false)
+  const [downloadGateOpen, setDownloadGateOpen] = useState(false)
+  const [packRestored, setPackRestored] = useState(false)
+  const [pendingDownload, setPendingDownload] = useState<{ kind: 'image' | 'pack'; items: Wallpaper[]; name: string; resolution: WallpaperResolution; claimId: string } | null>(null)
+  const claimRequestInProgress = useRef(false)
+
+  useEffect(() => {
+    if (!supabase) return
+    let active = true
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null)
+      if (!session?.user) setIsPremium(false)
+    })
+    void supabase.auth.getSession().then(({ data, error: sessionError }) => {
+      if (!active) return
+      if (sessionError) throw sessionError
+      setUser(data.session?.user ?? null)
+    }).catch(sessionError => {
+      if (!active) return
+      setNotice(`No se pudo restaurar la sesión: ${sessionError instanceof Error ? sessionError.message : 'Error desconocido.'}`)
+      setNoticeError(true)
+    })
+    return () => {
+      active = false
+      subscription.unsubscribe()
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!supabase || !user) return
+    const client = supabase
+    let active = true
+    const checkoutReturned = new URLSearchParams(window.location.search).get('premium') === 'success'
+    const loadEntitlement = async () => {
+      for (let attempt = 0; attempt < (checkoutReturned ? 6 : 1); attempt++) {
+        const { data, error: entitlementError } = await client
+          .from('user_entitlements')
+          .select('plan,status,current_period_end')
+          .eq('user_id', user.id)
+          .single()
+        if (!active) return
+        if (entitlementError) throw entitlementError
+        const premium = data.plan === 'premium'
+          && ['active', 'trialing'].includes(data.status)
+          && (!data.current_period_end || new Date(data.current_period_end).getTime() > Date.now())
+        setIsPremium(premium)
+        if (premium && checkoutReturned) {
+          const url = new URL(window.location.href)
+          url.searchParams.delete('premium')
+          window.history.replaceState({}, '', url)
+        }
+        if (premium || !checkoutReturned) return
+        await new Promise(resolve => window.setTimeout(resolve, 2000))
+      }
+    }
+    void loadEntitlement().catch(entitlementError => {
+      if (!active) return
+      setNotice(`No se pudo consultar tu plan: ${entitlementError instanceof Error ? entitlementError.message : 'Error desconocido.'}`)
+      setNoticeError(true)
+    })
+    return () => { active = false }
+  }, [user])
+
+  useEffect(() => {
+    if (loading || error || packRestored) return
+    try {
+      const savedIds: unknown = JSON.parse(sessionStorage.getItem('fondoselect:selected') ?? '[]')
+      if (Array.isArray(savedIds) && savedIds.every(id => typeof id === 'string')) {
+        const ids = new Set(savedIds)
+        setSelected(wallpapers.filter(wallpaper => ids.has(wallpaper.id)))
+      }
+    } catch (storageError) {
+      console.error('Unable to restore the selected pack', storageError)
+      setNotice('No se pudo restaurar el pack guardado en esta pestaña.')
+      setNoticeError(true)
+    } finally {
+      setPackRestored(true)
+    }
+  }, [error, loading, packRestored, wallpapers])
+
+  useEffect(() => {
+    if (!packRestored) return
+    try {
+      sessionStorage.setItem('fondoselect:selected', JSON.stringify(selected.map(item => item.id)))
+    } catch (storageError) {
+      console.error('Unable to save the selected pack', storageError)
+      setNotice('No se pudo guardar el pack en esta pestaña.')
+      setNoticeError(true)
+    }
+  }, [packRestored, selected])
 
   const withDimensions = (wallpaper: Wallpaper) => ({
     ...wallpaper,
@@ -147,48 +243,223 @@ export default function App() {
   }, [wallpapers, search, category, format, activeTag, sort, likes, downloads, dimensions])
 
   const toggleWallpaper = (wallpaper: Wallpaper) => {
-    setSelected(current => current.some(item => item.id === wallpaper.id)
+    const alreadySelected = selected.some(item => item.id === wallpaper.id)
+    if (!alreadySelected && !isPremium && selected.length >= 20) {
+      setNotice('El plan gratuito permite hasta 20 imágenes por pack. Premium no tiene límite.')
+      setNoticeError(true)
+      return
+    }
+    setSelected(current => alreadySelected
       ? current.filter(item => item.id !== wallpaper.id)
       : [...current, wallpaper])
   }
 
   const customizePreset = (preset: Preset) => {
     const items = presetItems(preset, wallpapers)
+    const selectedIds = new Set(selected.map(item => item.id))
+    const additions = items.filter(item => !selectedIds.has(item.id))
+    const availableSlots = isPremium ? additions.length : Math.max(0, 20 - selected.length)
     setSelected(current => {
       const ids = new Set(current.map(item => item.id))
-      return [...current, ...items.filter(item => !ids.has(item.id))]
+      const newItems = additions.filter(item => !ids.has(item.id))
+      return [...current, ...newItems.slice(0, availableSlots)]
     })
+    if (!isPremium && additions.length > availableSlots) {
+      setNotice('El plan gratuito permite hasta 20 imágenes por pack. Algunas imágenes no se añadieron.')
+      setNoticeError(true)
+    }
     setPackName(`Colección ${preset.name}`)
     setBuilderOpen(true)
   }
 
-  const startDownload = async (items: Wallpaper[], name: string) => {
+  const executeDownload = async (
+    kind: 'image' | 'pack',
+    items: Wallpaper[],
+    name: string,
+    claimId: string,
+    selectedResolution: WallpaperResolution = 'original',
+  ) => {
+    if (!supabase || !user) {
+      if (supabase) {
+        const { error: releaseError } = await supabase.rpc('finish_download', {
+          p_claim_id: claimId,
+          p_success: false,
+        })
+        if (releaseError) console.error('Failed to release download claim', releaseError)
+      }
+      setNotice('Inicia sesión para descargar.')
+      setNoticeError(true)
+      setAuthOpen(true)
+      return
+    }
+
+    let downloaded = false
     try {
-      setProgress({ percent: 0, message: 'Preparando tu pack…' })
-      await downloadPack(items, name, (percent, message) => setProgress({ percent, message }))
+      if (kind === 'pack') {
+        setProgress({ percent: 0, message: 'Preparando tu pack…' })
+        await downloadPack(items, name, (percent, message) => setProgress({ percent, message }))
+      } else {
+        await downloadWallpaper(items[0], selectedResolution)
+      }
+      downloaded = true
+      const { error: finishError } = await supabase.rpc('finish_download', {
+        p_claim_id: claimId,
+        p_success: true,
+      })
+      if (finishError) throw new Error(`La descarga se completó, pero no se pudo registrar: ${finishError.message}`)
       setDownloads(current => {
         const next = { ...current }
         items.forEach(item => { next[item.id] = (next[item.id] ?? 0) + 1 })
         return next
       })
-      setNotice('Tu ZIP está listo. La descarga comenzó.')
+      setNotice(kind === 'pack'
+        ? 'Tu ZIP está listo. La descarga comenzó.'
+        : selectedResolution === 'original'
+          ? 'Descarga iniciada en su resolución original.'
+          : 'Descarga preparada sin ampliar la imagen original.')
       setNoticeError(false)
     } catch (downloadError) {
-      setNotice(downloadError instanceof Error ? downloadError.message : 'No se pudo preparar el ZIP.')
+      let message = downloadError instanceof Error ? downloadError.message : 'No se pudo completar la descarga.'
+      if (!downloaded) {
+        try {
+          const { error: releaseError } = await supabase.rpc('finish_download', {
+            p_claim_id: claimId,
+            p_success: false,
+          })
+          if (releaseError) throw releaseError
+        } catch (releaseError) {
+          console.error('Failed to release download claim', releaseError)
+          message += ' No se pudo liberar la reserva; contacta con soporte si el límite queda bloqueado.'
+        }
+      }
+      setNotice(message)
       setNoticeError(true)
     } finally {
-      window.setTimeout(() => setProgress(null), 1200)
+      if (kind === 'pack') window.setTimeout(() => setProgress(null), 1200)
     }
   }
 
+  const requestDownload = (
+    kind: 'image' | 'pack',
+    items: Wallpaper[],
+    name: string,
+    selectedResolution: WallpaperResolution = 'original',
+  ) => {
+    if (!supabase) {
+      setNotice('El inicio de sesión aún no está configurado. Inténtalo más tarde.')
+      setNoticeError(true)
+      return
+    }
+    if (!user) {
+      setAuthOpen(true)
+      return
+    }
+    if (kind === 'pack' && !items.length) {
+      setNotice('Añade al menos un fondo.')
+      setNoticeError(true)
+      return
+    }
+    if (claimRequestInProgress.current) return
+    claimRequestInProgress.current = true
+    void (async () => {
+      try {
+        const { data: claim, error: claimError } = await supabase.rpc('claim_download', {
+          p_kind: kind,
+          p_image_count: items.length,
+        })
+        if (claimError) {
+          const message = claimError.message.includes('daily_pack_limit_reached')
+            ? 'Alcanzaste el límite gratuito de 2 packs al día. Vuelve mañana o pásate a Premium.'
+            : claimError.message.includes('free_pack_image_limit')
+              ? 'El plan gratuito permite hasta 20 imágenes por pack. Premium no tiene límite.'
+              : claimError.message
+          setNotice(message)
+          setNoticeError(true)
+          return
+        }
+
+        if (!claim || typeof claim.claim_id !== 'string' || typeof claim.is_premium !== 'boolean') {
+          throw new Error('El servidor devolvió una reserva de descarga inválida.')
+        }
+        if (!claim.is_premium) {
+          setPendingDownload({ kind, items, name, resolution: selectedResolution, claimId: claim.claim_id })
+          setDownloadGateOpen(true)
+          return
+        }
+        void executeDownload(kind, items, name, claim.claim_id, selectedResolution)
+      } catch (requestError) {
+        setNotice(requestError instanceof Error ? requestError.message : 'No se pudo autorizar la descarga.')
+        setNoticeError(true)
+      } finally {
+        claimRequestInProgress.current = false
+      }
+    })()
+  }
+
+  const continueDownload = () => {
+    if (!pendingDownload) return
+    setDownloadGateOpen(false)
+    void executeDownload(
+      pendingDownload.kind,
+      pendingDownload.items,
+      pendingDownload.name,
+      pendingDownload.claimId,
+      pendingDownload.resolution,
+    )
+    setPendingDownload(null)
+  }
+
+  const cancelDownload = () => {
+    const claimId = pendingDownload?.claimId
+    setDownloadGateOpen(false)
+    setPendingDownload(null)
+    if (claimId && supabase) {
+      void Promise.resolve(supabase.rpc('finish_download', { p_claim_id: claimId, p_success: false }).then(({ error: releaseError }) => {
+        if (releaseError) throw releaseError
+      })).catch(releaseError => {
+          setNotice(`No se pudo liberar la reserva de descarga: ${releaseError instanceof Error ? releaseError.message : 'Error desconocido.'}`)
+          setNoticeError(true)
+      })
+    }
+  }
+
+  const startDownload = (items: Wallpaper[], name: string) => {
+    requestDownload('pack', items, name)
+  }
+
   const downloadSingle = async (wallpaper: Wallpaper, selectedResolution: WallpaperResolution = 'original') => {
+    requestDownload('image', [wallpaper], wallpaper.title, selectedResolution)
+  }
+
+  const premiumAction = async () => {
+    if (!supabase) {
+      setNotice('Premium aún no está configurado. Inténtalo más tarde.')
+      setNoticeError(true)
+      return
+    }
+    if (!user) {
+      setAuthOpen(true)
+      return
+    }
+    const functionName = isPremium ? 'create-customer-portal' : 'create-checkout-session'
     try {
-      await downloadWallpaper(wallpaper, selectedResolution)
-      setDownloads(current => ({ ...current, [wallpaper.id]: (current[wallpaper.id] ?? 0) + 1 }))
-      setNotice(selectedResolution === 'original' ? 'Descarga iniciada en su resolución original.' : 'Descarga preparada sin ampliar la imagen original.')
-      setNoticeError(false)
-    } catch (downloadError) {
-      setNotice(downloadError instanceof Error ? downloadError.message : 'No se pudo descargar el fondo.')
+      const { data, error: billingError } = await supabase.functions.invoke(functionName)
+      if (billingError) throw billingError
+      if (typeof data?.url !== 'string') {
+        throw new Error('La respuesta de facturación no incluyó un enlace válido.')
+      }
+      window.location.assign(data.url)
+    } catch (billingError) {
+      setNotice(`No se pudo abrir la gestión de Premium: ${billingError instanceof Error ? billingError.message : 'Error desconocido.'}`)
+      setNoticeError(true)
+    }
+  }
+
+  const signOut = async () => {
+    if (!supabase) return
+    const { error: signOutError } = await supabase.auth.signOut()
+    if (signOutError) {
+      setNotice(`No se pudo cerrar sesión: ${signOutError.message}`)
       setNoticeError(true)
     }
   }
@@ -208,7 +479,7 @@ export default function App() {
   return (
     <main className={theme === 'dark' ? 'app theme-dark' : 'app theme-light'}>
       <header className="topbar">
-        <a className="brand" href="#inicio" aria-label="Wallora, inicio">wallora<span>4K</span></a>
+        <a className="brand" href="#inicio" aria-label="FondoSelect, inicio">FondoSelect<span>4K</span></a>
         <nav className={mobileMenu ? 'nav-links nav-open' : 'nav-links'} aria-label="Navegación principal">
           <a href="#explorar" onClick={() => setMobileMenu(false)}>Explorar fondos</a>
           <a href="#prepacks" onClick={() => setMobileMenu(false)}>Pre-packs</a>
@@ -217,6 +488,12 @@ export default function App() {
         <div className="top-actions">
           <button className="icon-button theme-toggle" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} aria-label={theme === 'dark' ? 'Activar modo claro' : 'Activar modo oscuro'}>
             {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
+          </button>
+          <button className="account-top-button" onClick={user ? signOut : () => setAuthOpen(true)} title={user?.email}>
+            {user ? 'Salir' : 'Entrar'}
+          </button>
+          <button className="premium-top-button" onClick={() => void premiumAction()}>
+            {isPremium ? 'Gestionar Premium' : 'Premium · $2.50/mes'}
           </button>
           <button className="pack-button" onClick={() => setBuilderOpen(true)}><Package size={16} /> Mi pack <span>{selected.length}</span></button>
           <button className="icon-button menu-button" onClick={() => setMobileMenu(!mobileMenu)} aria-label="Abrir navegación">{mobileMenu ? <X size={19} /> : <Menu size={19} />}</button>
@@ -334,7 +611,7 @@ export default function App() {
         {!loading && filtered.length > visibleCount && <button className="load-more" onClick={() => setVisibleCount(count => count + 48)}>Mostrar más fondos <ArrowDownWideNarrow size={16} /></button>}
       </section>
 
-      <footer className="footer section-shell"><a className="brand" href="#inicio">wallora<span>4K</span></a><p>Una mejor forma de encontrar y llevar tus fondos favoritos.</p><span>Imágenes servidas directamente desde GitHub · <a href="https://github.com/dharmx/walls" target="_blank" rel="noreferrer">dharmx/walls</a></span></footer>
+      <footer className="footer section-shell"><a className="brand" href="#inicio">FondoSelect<span>4K</span></a><p>Una mejor forma de encontrar y llevar tus fondos favoritos.</p><span>Imágenes servidas directamente desde GitHub · <a href="https://github.com/dharmx/walls" target="_blank" rel="noreferrer">dharmx/walls</a></span></footer>
 
       {selected.length > 0 && !builderOpen && <aside className="pack-drawer">
         <div className="drawer-thumbs">{selected.slice(0, 4).map(item => <img key={item.id} src={item.url} alt="" />)}{selected.length > 4 && <span>+{selected.length - 4}</span>}</div>
@@ -343,7 +620,7 @@ export default function App() {
         <button className="icon-button drawer-download" onClick={() => startDownload(selected, packName)} aria-label="Descargar pack"><Download size={17} /></button>
       </aside>}
 
-      {builderOpen && <PackBuilder items={selected} name={packName} busy={progress !== null} onName={setPackName} onRemove={id => setSelected(current => current.filter(item => item.id !== id))} onMove={moveItem} onClose={() => setBuilderOpen(false)} onDownload={() => startDownload(selected, packName)} />}
+      {builderOpen && <PackBuilder items={selected} name={packName} busy={progress !== null} maxItems={isPremium ? null : 20} onName={setPackName} onRemove={id => setSelected(current => current.filter(item => item.id !== id))} onMove={moveItem} onClose={() => setBuilderOpen(false)} onDownload={() => startDownload(selected, packName)} />}
 
       {detail && <WallpaperDetail
         wallpaper={detail}
@@ -367,6 +644,12 @@ export default function App() {
         onTag={tag => { setActiveTag(tag); setDetail(null); document.getElementById('explorar')?.scrollIntoView({ behavior: 'smooth' }) }}
         onToggle={() => toggleWallpaper(detail)}
         onDownload={() => downloadSingle(detail, resolution)}
+      />}
+
+      {authOpen && <AuthDialog onClose={() => setAuthOpen(false)} />}
+      {downloadGateOpen && <DownloadGate
+        onContinue={continueDownload}
+        onClose={cancelDownload}
       />}
 
       {progress && <div className="progress-toast" role="status"><div className="progress-head"><span>{progress.message}</span><strong>{progress.percent}%</strong></div><div className="progress-track"><span style={{ width: `${progress.percent}%` }} /></div></div>}
@@ -429,14 +712,14 @@ function WallpaperDetail({
   return (
     <div className="detail-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) onClose() }}>
       <section className="detail-modal" role="dialog" aria-modal="true" aria-labelledby="detail-title">
-        <header className="detail-header"><a className="brand" href="#inicio">wallora<span>4K</span></a><div className="detail-modes">
+        <header className="detail-header"><a className="brand" href="#inicio">FondoSelect<span>4K</span></a><div className="detail-modes">
           <button className={mode === 'original' ? 'active' : ''} onClick={() => onMode('original')}><Image size={15} /> Original</button>
           <button className={mode === 'macbook' ? 'active' : ''} onClick={() => onMode('macbook')}><Laptop size={15} /> MacBook</button>
           <button className={mode === 'iphone' ? 'active' : ''} onClick={() => onMode('iphone')}><Smartphone size={15} /> iPhone</button>
         </div><button className="icon-button" onClick={onClose} aria-label="Cerrar inspector"><X size={19} /></button></header>
         <div className="detail-content">
           <div className={`detail-preview preview-${mode}`}>
-            {mode === 'macbook' && <div className="laptop-top"><span>● ● ●</span><span>wallora</span><span>Wi-Fi　100%</span></div>}
+            {mode === 'macbook' && <div className="laptop-top"><span>● ● ●</span><span>FondoSelect</span><span>Wi-Fi　100%</span></div>}
             {mode === 'iphone' && <div className="phone-island" />}
             <img src={wallpaper.url} alt={wallpaper.title} />
             {mode === 'iphone' && <div className="phone-clock">9:41</div>}

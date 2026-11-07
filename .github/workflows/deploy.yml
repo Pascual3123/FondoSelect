@@ -1,4 +1,4 @@
-name: Deploy Wallora to GitHub Pages
+name: Deploy FondoSelect to GitHub Pages
 
 on:
   push:
@@ -29,6 +29,14 @@ jobs:
         run: npm ci
       - name: Build
         run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+          VITE_GAM_REWARDED_SLOT: ${{ vars.VITE_GAM_REWARDED_SLOT }}
+          VITE_GAM_DISPLAY_SLOT: ${{ vars.VITE_GAM_DISPLAY_SLOT }}
+          VITE_GAM_CMP_READY: ${{ vars.VITE_GAM_CMP_READY }}
+          VITE_TERMS_URL: ${{ vars.VITE_TERMS_URL }}
+          VITE_PRIVACY_POLICY_URL: ${{ vars.VITE_PRIVACY_POLICY_URL }}
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:

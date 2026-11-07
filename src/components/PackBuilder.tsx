@@ -5,6 +5,7 @@ interface Props {
   items: Wallpaper[]
   name: string
   busy: boolean
+  maxItems: number | null
   onName: (name: string) => void
   onRemove: (id: string) => void
   onMove: (index: number, direction: number) => void
@@ -36,6 +37,11 @@ export default function PackBuilder(props: Props) {
       <label className="block mt-6 mb-2" htmlFor="pack-name">
         Nombre del archivo
       </label>
+      <p className="pack-limit-note">
+        {props.maxItems === null
+          ? `${props.items.length} imágenes · Sin límite con Premium`
+          : `${props.items.length}/${props.maxItems} imágenes · Máximo 2 packs al día`}
+      </p>
       <input
         id="pack-name"
         value={props.name}

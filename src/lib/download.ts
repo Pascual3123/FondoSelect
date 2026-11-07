@@ -106,7 +106,7 @@ export async function downloadPack(
   zip.file(
     'README_PACK_INFO.txt',
     [
-      `Wallora — ${name}`,
+      `FondoSelect — ${name}`,
       `Fecha: ${new Date().toISOString()}`,
       'Fuente: https://github.com/dharmx/walls',
       'Créditos de la colección: dharmx/walls y sus colaboradores.',
@@ -127,6 +127,6 @@ export async function downloadPack(
   )
 
   const filename = name.trim().replace(/[<>:"/\\|?*\x00-\x1F]/g, '-')
-  saveBlob(blob, `${filename || 'Wallora-Pack'}.zip`)
+  saveBlob(blob, `${filename || 'FondoSelect-Pack'}.zip`)
   onProgress(100, '¡ZIP generado! Descarga iniciada.')
 }
