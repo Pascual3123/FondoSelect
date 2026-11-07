@@ -11,15 +11,70 @@ const sources = JSON.parse(
 const temporaryDirectory = mkdtempSync(join(tmpdir(), 'wallpaper-catalog-'))
 const files = []
 const revisions = {}
+const genericFilenameWords = new Set([
+  'wallpaper',
+  'wallpapers',
+  'image',
+  'images',
+  'img',
+  'photo',
+  'photos',
+  'picture',
+  'pictures',
+  'download',
+  'original',
+  'untitled',
+  'screenshot',
+  'screen',
+  'background',
+  'desktop',
+  'mobile',
+  'anime',
+  'art',
+  'abstract',
+  'animated',
+  'backgrounds',
+  'banner',
+  'episode',
+  'color',
+  'colors',
+  'landscape',
+  'nature',
+  'minimal',
+  'nord',
+  'dark',
+  'light',
+  'wide',
+  'result',
+  'illust',
+  'wallpaperflare',
+  'wallhaven',
+  'p',
+  'hd',
+  'uhd',
+  '4k',
+  '8k',
+  'final',
+  'copy',
+  'new',
+])
 
 function shouldSkipCatalogPath(path) {
   const normalized = path.replace(/\\/g, '/').toLowerCase()
   const basename = normalized.split('/').pop() ?? ''
+  const filename = basename.replace(/\.[^.]+$/, '').replace(/(?<=\p{L})\d+$/u, '')
+  const words = filename
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter(word => word.length > 1 && !/\d/.test(word))
 
+  if (basename.startsWith('.')) return true
   if (normalized.includes('/__macosx/')) return true
   if (normalized.includes('/desktop/wallpapers/') || normalized.startsWith('desktop/wallpapers/')) return true
   if (/\d{3,5}x\d{3,5}/.test(basename)) return true
   if (/^windows(?:[._ -]?\d+)?(?:_logo|_joke|_pink)?\.(png|jpe?g|webp)$/i.test(basename)) return true
+  if (!words.some(word => !genericFilenameWords.has(word))) return true
 
   return false
 }
