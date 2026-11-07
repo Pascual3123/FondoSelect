@@ -83,6 +83,9 @@ export async function downloadPack(
   if (!wallpapers.length) throw new Error('Añade al menos un fondo.')
 
   const zip = new JSZip()
+  const sources = [...new Map(
+    wallpapers.map(wallpaper => [wallpaper.sourceRepo, wallpaper.sourceUrl]),
+  )]
 
   for (let i = 0; i < wallpapers.length; i++) {
     const wallpaper = wallpapers[i]
@@ -96,7 +99,10 @@ export async function downloadPack(
       throw new Error(`No se pudo descargar: ${wallpaper.title}`)
     }
 
-    zip.file(wallpaper.path, await response.arrayBuffer())
+    zip.file(
+      `${wallpaper.sourceRepo}/${wallpaper.path}`,
+      await response.arrayBuffer(),
+    )
     onProgress(
       Math.round(((i + 1) / wallpapers.length) * 80),
       `Recibidos ${i + 1}/${wallpapers.length} archivos`,
@@ -108,8 +114,8 @@ export async function downloadPack(
     [
       `FondoSelect — ${name}`,
       `Fecha: ${new Date().toISOString()}`,
-      'Fuente: https://github.com/dharmx/walls',
-      'Créditos de la colección: dharmx/walls y sus colaboradores.',
+      'Fuentes:',
+      ...sources.map(([repository, url]) => `- ${repository}: ${url}`),
       'Autoría individual: no verificada; consulta la fuente original.',
       'No se garantiza licencia CC0 para estas imágenes.',
       'Comprueba los permisos de cada imagen antes de redistribuirla.',

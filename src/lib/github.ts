@@ -1,52 +1,78 @@
+import sourceDefinitions from '../data/wallpaper-sources.json'
 import type { Wallpaper } from '../types/wallpaper'
 
-interface GitTree {
-  truncated?: boolean
-  tree: {
-    path: string
-    type: string
-    size?: number
-  }[]
+interface WallpaperSource {
+  owner: string
+  repo: string
+  branch: string
+  category?: string
+  animeOnly?: boolean
 }
 
-export async function getWallpapers(
-  signal?: AbortSignal,
-): Promise<Wallpaper[]> {
+interface CatalogFile {
+  sourceRepo: string
+  path: string
+  size?: number
+}
+
+interface WallpaperCatalog {
+  files: CatalogFile[]
+}
+
+const sources: WallpaperSource[] = sourceDefinitions
+
+function shouldSkipWallpaperPath(path: string) {
+  const normalized = path.replace(/\\/g, '/').toLowerCase()
+  const basename = normalized.split('/').pop() ?? ''
+
+  if (normalized.includes('/__macosx/')) return true
+  if (normalized.includes('/desktop/wallpapers/') || normalized.startsWith('desktop/wallpapers/')) return true
+  if (/\d{3,5}x\d{3,5}/.test(basename)) return true
+  if (/^windows(?:[._ -]?\d+)?(?:_logo|_joke|_pink)?\.(png|jpe?g|webp)$/i.test(basename)) return true
+
+  return false
+}
+
+export async function getWallpapers(signal?: AbortSignal): Promise<Wallpaper[]> {
   const response = await fetch(
-    'https://api.github.com/repos/dharmx/walls/git/trees/main?recursive=1',
+    `${import.meta.env.BASE_URL}wallpaper-catalog.json`,
     { signal },
   )
-
   if (!response.ok) {
-    throw new Error(
-      `GitHub respondió ${response.status}. Puede haberse alcanzado el límite público de peticiones; inténtalo más tarde.`,
-    )
+    throw new Error(`No se pudo cargar el índice local de fondos (HTTP ${response.status}).`)
   }
 
-  const data: GitTree = await response.json()
-
-  if (data.truncated) {
-    throw new Error('GitHub devolvió un catálogo incompleto. Es necesario recorrer las subcarpetas por separado.')
-  }
-
-  return data.tree
-    .filter(item =>
-      item.type === 'blob' && /\.(png|jpe?g|webp)$/i.test(item.path),
+  const catalog: WallpaperCatalog = await response.json()
+  return catalog.files.flatMap(item => {
+    const source = sources.find(
+      candidate => `${candidate.owner}/${candidate.repo}` === item.sourceRepo,
     )
-    .map(item => ({
-      id: item.path,
+    if (!source || shouldSkipWallpaperPath(item.path)) {
+      return []
+    }
+    if (source.animeOnly && !/anime|waifu/i.test(item.path)) {
+      return []
+    }
+
+    return [{
+      id: item.sourceRepo === 'dharmx/walls'
+        ? item.path
+        : `${item.sourceRepo}:${item.path}`,
       title: item.path
         .split('/')
         .pop()!
         .replace(/\.[^.]+$/, '')
         .replace(/[-_]/g, ' '),
-      category: item.path.includes('/')
+      category: source.category ?? (item.path.includes('/')
         ? item.path.split('/')[0]
-        : 'Otros',
+        : 'Otros'),
       path: item.path,
       size: item.size,
       url:
-        'https://raw.githubusercontent.com/dharmx/walls/main/' +
+        `https://raw.githubusercontent.com/${item.sourceRepo}/${source.branch}/` +
         item.path.split('/').map(encodeURIComponent).join('/'),
-    }))
+      sourceRepo: item.sourceRepo,
+      sourceUrl: `https://github.com/${item.sourceRepo}`,
+    }]
+  })
 }

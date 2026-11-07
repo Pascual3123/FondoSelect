@@ -1,0 +1,8 @@
+[
+  { "owner": "dharmx", "repo": "walls", "branch": "main" },
+  { "owner": "Samyc2002", "repo": "Anime-Wallpapers", "branch": "main", "category": "Anime" },
+  { "owner": "deadduck-09", "repo": "FireWalls", "branch": "main", "category": "Anime", "animeOnly": true },
+  { "owner": "LukePeetoom", "repo": "anime_wallpapers", "branch": "main", "category": "Anime" },
+  { "owner": "MilesCorporate", "repo": "The-Wallpaper-Collection", "branch": "main", "category": "Anime", "animeOnly": true },
+  { "owner": "na-ive", "repo": "wallpapers", "branch": "main", "category": "Anime", "animeOnly": true }
+]

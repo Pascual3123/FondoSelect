@@ -93,6 +93,9 @@ function formatSize(bytes?: number) {
 
 export default function App() {
   const { wallpapers, loading, error } = useWallpapers()
+  const wallpaperSources = Array.from(new Map(
+    wallpapers.map(wallpaper => [wallpaper.sourceRepo, wallpaper.sourceUrl]),
+  ))
   const [selected, setSelected] = useState<Wallpaper[]>([])
   const [builderOpen, setBuilderOpen] = useState(false)
   const [search, setSearch] = useState('')
@@ -122,6 +125,16 @@ export default function App() {
   const [packRestored, setPackRestored] = useState(false)
   const [pendingDownload, setPendingDownload] = useState<{ kind: 'image' | 'pack'; items: Wallpaper[]; name: string; resolution: WallpaperResolution; claimId: string } | null>(null)
   const claimRequestInProgress = useRef(false)
+
+  useEffect(() => {
+    const openBuilderFromHash = () => {
+      if (window.location.hash === '#creador') setBuilderOpen(true)
+    }
+
+    openBuilderFromHash()
+    window.addEventListener('hashchange', openBuilderFromHash)
+    return () => window.removeEventListener('hashchange', openBuilderFromHash)
+  }, [])
 
   useEffect(() => {
     if (!supabase) return
@@ -509,7 +522,15 @@ export default function App() {
             <a className="button-primary" href="#explorar">Armar mi pack <ArrowUpDown size={16} /></a>
             <a className="button-secondary" href="#prepacks">Explorar pre-packs <ChevronRight size={16} /></a>
           </div>
-          <p className="source-note"><span className="status-dot" /> Imágenes remotas de <a href="https://github.com/dharmx/walls" target="_blank" rel="noreferrer">dharmx/walls</a></p>
+          <p className="source-note">
+            <span className="status-dot" /> Imágenes remotas de
+            {wallpaperSources.map(([repository, url], index) => (
+              <span key={repository}>
+                {index > 0 ? ', ' : ' '}
+                <a href={url} target="_blank" rel="noreferrer">{repository}</a>
+              </span>
+            ))}
+          </p>
         </div>
         <div className="hero-visual">
           {featured ? (
@@ -587,7 +608,7 @@ export default function App() {
         <div className="tag-row"><span>Explora por estilo</span>{quickTags.map(tag => <button key={tag} className={activeTag === tag ? 'tag-chip active' : 'tag-chip'} onClick={() => { setActiveTag(activeTag === tag ? '' : tag); setSearch('') }}>#{tag}</button>)}</div>
         <p className="session-note">Los favoritos y las descargas se cuentan solo durante esta visita.</p>
 
-        {loading && <div className="loading-state"><span className="loader" />Conectando con el catálogo de dharmx/walls…</div>}
+        {loading && <div className="loading-state"><span className="loader" />Conectando con catálogos de GitHub…</div>}
         {error && <div className="error-state"><strong>No pudimos cargar los fondos.</strong><span>{error}</span><button onClick={() => window.location.reload()}>Intentar de nuevo</button></div>}
         {!loading && !error && !filtered.length && <div className="empty-state"><Search size={24} /><strong>No encontramos fondos con esos filtros.</strong><span>Prueba otra palabra o categoría.</span><button onClick={() => { setSearch(''); setCategory('Todos'); setActiveTag(''); setFormat('Todos') }}>Limpiar filtros</button></div>}
         <div className="wallpaper-grid">

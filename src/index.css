@@ -80,7 +80,7 @@ h1, h2, h3, p { margin-top: 0; }
 .button-primary { background: var(--accent); color: var(--accent-ink); border: 1px solid var(--accent); }
 .button-primary:hover, .button-secondary:hover { transform: translateY(-1px); }
 .button-secondary { color: var(--text); background: transparent; border: 1px solid var(--line); }
-.source-note { margin: 26px 0 0; display: flex; align-items: center; gap: 7px; color: var(--faint); font-size: 10px; }
+.source-note { margin: 26px 0 0; display: flex; flex-wrap: wrap; align-items: center; gap: 7px; color: var(--faint); font-size: 10px; }
 .source-note a, .footer a:not(.brand) { color: var(--muted); text-decoration: underline; text-underline-offset: 3px; }
 .status-dot { width: 6px; height: 6px; background: #95c79a; border-radius: 50%; }
 .hero-visual { position: relative; }

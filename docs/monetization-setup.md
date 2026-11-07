@@ -6,7 +6,7 @@ FondoSelect sigue siendo una app estática de GitHub Pages; Supabase aplica la a
 
 1. Crea un proyecto Supabase y ejecuta en el SQL Editor, en orden, `supabase/migrations/20261106120000_download_plans.sql` y `supabase/migrations/20261106130000_user_profiles.sql`. Supabase Auth guarda las cuentas; la tabla `profiles` conserva el nombre y avatar de cada proveedor social, con acceso restringido al propio usuario.
 2. En **Authentication → Providers**, habilita Google, GitHub y correo electrónico (OTP/enlace de acceso).
-3. En **Authentication → URL Configuration**, configura como URL del sitio `https://pascual3123.github.io/wallora/` y añade esa dirección a las URL permitidas de redirección. Para probar en Codespaces, añade también `https://*.app.github.dev/**`.
+3. En **Authentication → URL Configuration**, configura como URL del sitio `https://pascual3123.github.io/FondoSelect/` y añade esa dirección a las URL permitidas de redirección. Para probar en Codespaces, añade también `https://*.app.github.dev/**`.
 4. En Google Cloud crea un cliente OAuth Web. Como URI de redirección autorizada usa `https://<PROJECT_REF>.supabase.co/auth/v1/callback`, y copia el ID y secreto en la configuración del proveedor Google de Supabase.
 5. En GitHub crea un OAuth App. Configura su **Authorization callback URL** con `https://<PROJECT_REF>.supabase.co/auth/v1/callback` y copia el Client ID y Client Secret en la configuración del proveedor GitHub de Supabase.
 6. Cambia `project_id` en `supabase/config.toml` por el ref de tu proyecto, instala Supabase CLI, ejecuta `supabase link --project-ref <PROJECT_REF>` y despliega las funciones `create-checkout-session`, `create-customer-portal` y `stripe-webhook`. La función del webhook debe desplegarse sin verificación JWT (`--no-verify-jwt`); Stripe valida su firma.
@@ -17,7 +17,7 @@ FondoSelect sigue siendo una app estática de GitHub Pages; Supabase aplica la a
 1. Crea un precio recurrente de **2,50 USD cada mes** y copia el ID `price_...`.
 2. Activa el portal de clientes para permitir cancelar y administrar la suscripción.
 3. Añade un endpoint webhook `https://<PROJECT_REF>.supabase.co/functions/v1/stripe-webhook` con los eventos `customer.subscription.created`, `customer.subscription.updated` y `customer.subscription.deleted`.
-4. En **Supabase → Edge Functions → Secrets**, configura `STRIPE_SECRET_KEY`, `STRIPE_PRICE_ID`, `STRIPE_WEBHOOK_SECRET` y `SITE_URL=https://pascual3123.github.io/wallora/`. No guardes esos valores en el repositorio ni en el frontend.
+4. En **Supabase → Edge Functions → Secrets**, configura `STRIPE_SECRET_KEY`, `STRIPE_PRICE_ID`, `STRIPE_WEBHOOK_SECRET` y `SITE_URL=https://pascual3123.github.io/FondoSelect/`. No guardes esos valores en el repositorio ni en el frontend.
 
 ## 3. Anuncios
 
