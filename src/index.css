@@ -257,6 +257,51 @@ dialog input { width: 100%; height: 40px; padding: 0 10px; border: 1px solid var
 .fondoselect-ad-slot { min-height: 250px; margin: 15px auto; display: grid; place-items: center; }
 .account-actions { display: flex; justify-content: flex-end; gap: 9px; margin-top: 20px; }
 .account-actions button { min-height: 38px; padding-inline: 14px; border-radius: 5px; font-size: 9px; }
+.account-panel { width: min(560px, 100%); max-height: min(900px, calc(100dvh - 36px)); overflow-y: auto; }
+.profile-summary { display: flex; align-items: center; gap: 13px; margin: 22px 0; }
+.profile-avatar { position: relative; width: 58px; height: 58px; flex: 0 0 58px; display: grid; place-items: center; overflow: hidden; border: 1px solid var(--line); border-radius: 50%; color: var(--muted); background: var(--bg); }
+.profile-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.profile-avatar button { position: absolute; right: 0; bottom: 0; width: 23px; height: 23px; display: grid; place-items: center; border: 1px solid var(--surface); border-radius: 50%; color: var(--accent-ink); background: var(--accent); }
+.profile-avatar button:disabled { opacity: .6; }
+.profile-identity { min-width: 0; display: grid; gap: 5px; }
+.profile-identity strong { overflow: hidden; color: var(--text); font-size: 13px; text-overflow: ellipsis; }
+.profile-identity span { overflow: hidden; color: var(--muted); font-size: 10px; text-overflow: ellipsis; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+.profile-form { display: grid; gap: 7px; }
+.profile-form label, .delete-account label { color: var(--muted); font-size: 9px; }
+.profile-form-row { display: flex; gap: 8px; }
+.profile-form-row input, .delete-account input { min-width: 0; height: 38px; padding: 0 10px; border: 1px solid var(--line); border-radius: 4px; color: var(--text); background: var(--bg); font-size: 10px; }
+.profile-form-row input { flex: 1; }
+.profile-form-row button { min-height: 38px; padding-inline: 13px; border-radius: 4px; font-size: 9px; }
+.profile-form small { color: var(--faint); font-size: 8px; }
+.account-section { margin-top: 21px; padding-top: 17px; border-top: 1px solid var(--line); }
+.account-section-heading { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; color: var(--accent); }
+.account-section-heading h3 { margin: 0; color: var(--text); font-size: 11px; font-weight: 600; }
+.plan-summary { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 10px; }
+.plan-summary > div { display: grid; gap: 4px; }
+.plan-summary strong { color: var(--text); font-size: 12px; }
+.plan-summary span { color: var(--muted); font-size: 9px; }
+.plan-renewal { display: inline-flex; align-items: center; gap: 5px; text-align: right; }
+.account-wide-button { width: 100%; min-height: 37px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; border: 1px solid var(--line); border-radius: 4px; color: var(--text); background: var(--bg); font-size: 9px; }
+.account-wide-button:disabled { opacity: .6; cursor: default; }
+.history-empty { margin: 0; }
+.download-history { margin: 0; padding: 0; list-style: none; }
+.download-history li { min-height: 51px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--line); }
+.history-icon { width: 30px; height: 30px; flex: 0 0 30px; display: grid; place-items: center; border-radius: 5px; color: var(--accent); background: var(--surface-2); }
+.history-name { min-width: 0; flex: 1; display: grid; gap: 4px; }
+.history-name strong { overflow: hidden; color: var(--text); font-size: 9px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.history-name small, .download-history time { color: var(--muted); font-size: 8px; }
+.download-history time { flex: 0 0 auto; }
+.history-more { margin-top: 10px; padding: 6px 0; border: 0; color: var(--accent); background: transparent; font-size: 9px; }
+.history-more:disabled { opacity: .6; }
+.account-danger-section .account-section-heading { color: var(--muted); }
+.delete-account { margin-top: 14px; padding: 13px; border: 1px solid color-mix(in srgb, #f08e8e 30%, var(--line)); border-radius: 5px; }
+.delete-account > div { display: flex; align-items: center; gap: 7px; color: #f08e8e; font-size: 10px; }
+.delete-account p { margin: 8px 0 12px; color: var(--muted); font-size: 9px; line-height: 1.6; }
+.delete-account label { display: block; margin-bottom: 6px; }
+.delete-account input { width: 100%; }
+.delete-account-button { width: 100%; min-height: 36px; margin-top: 9px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; border: 1px solid #713c3c; border-radius: 4px; color: #f5baba; background: #351c1c; font-size: 9px; }
+.delete-account-button:disabled { opacity: .5; cursor: default; }
 
 .detail-backdrop { position: fixed; z-index: 50; inset: 0; padding: 22px; display: grid; place-items: center; overflow-y: auto; background: #030304e8; backdrop-filter: blur(9px); }
 .detail-modal { width: min(1140px, 100%); max-height: min(850px, calc(100dvh - 44px)); display: flex; flex-direction: column; border: 1px solid #333139; border-radius: 8px; overflow: hidden; background: var(--bg); }

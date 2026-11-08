@@ -20,6 +20,7 @@ import {
 } from 'lucide-react'
 import PackBuilder from './components/PackBuilder'
 import WallpaperCard from './components/WallpaperCard'
+import AccountPanel from './components/AccountPanel'
 import AuthDialog from './components/AuthDialog'
 import DownloadGate from './components/DownloadGate'
 import { useWallpapers } from './hooks/useWallpapers'
@@ -121,6 +122,7 @@ export default function App() {
   const [user, setUser] = useState<User | null>(null)
   const [isPremium, setIsPremium] = useState(false)
   const [authOpen, setAuthOpen] = useState(false)
+  const [accountOpen, setAccountOpen] = useState(false)
   const [downloadGateOpen, setDownloadGateOpen] = useState(false)
   const [packRestored, setPackRestored] = useState(false)
   const [pendingDownload, setPendingDownload] = useState<{ kind: 'image' | 'pack'; items: Wallpaper[]; name: string; resolution: WallpaperResolution; claimId: string } | null>(null)
@@ -141,7 +143,10 @@ export default function App() {
     let active = true
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null)
-      if (!session?.user) setIsPremium(false)
+      if (!session?.user) {
+        setIsPremium(false)
+        setAccountOpen(false)
+      }
     })
     void supabase.auth.getSession().then(({ data, error: sessionError }) => {
       if (!active) return
@@ -379,6 +384,7 @@ export default function App() {
         const { data: claim, error: claimError } = await supabase.rpc('claim_download', {
           p_kind: kind,
           p_image_count: items.length,
+          p_pack_name: kind === 'pack' ? name : null,
         })
         if (claimError) {
           const message = claimError.message.includes('daily_pack_limit_reached')
@@ -468,15 +474,6 @@ export default function App() {
     }
   }
 
-  const signOut = async () => {
-    if (!supabase) return
-    const { error: signOutError } = await supabase.auth.signOut()
-    if (signOutError) {
-      setNotice(`No se pudo cerrar sesión: ${signOutError.message}`)
-      setNoticeError(true)
-    }
-  }
-
   const moveItem = (index: number, direction: number) => {
     setSelected(current => {
       const next = [...current]
@@ -502,8 +499,8 @@ export default function App() {
           <button className="icon-button theme-toggle" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} aria-label={theme === 'dark' ? 'Activar modo claro' : 'Activar modo oscuro'}>
             {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
           </button>
-          <button className="account-top-button" onClick={user ? signOut : () => setAuthOpen(true)} title={user?.email}>
-            {user ? 'Salir' : 'Entrar'}
+          <button className="account-top-button" onClick={user ? () => setAccountOpen(true) : () => setAuthOpen(true)} title={user?.email}>
+            {user ? 'Mi cuenta' : 'Entrar'}
           </button>
           <button className="premium-top-button" onClick={() => void premiumAction()}>
             {isPremium ? 'Gestionar Premium' : 'Premium · $2.50/mes'}
@@ -668,6 +665,17 @@ export default function App() {
       />}
 
       {authOpen && <AuthDialog onClose={() => setAuthOpen(false)} />}
+      {accountOpen && user && <AccountPanel
+        user={user}
+        isPremium={isPremium}
+        onClose={() => setAccountOpen(false)}
+        onDeleted={message => {
+          setAccountOpen(false)
+          setIsPremium(false)
+          setNotice(message ?? 'Tu cuenta se eliminó correctamente.')
+          setNoticeError(Boolean(message))
+        }}
+      />}
       {downloadGateOpen && <DownloadGate
         onContinue={continueDownload}
         onClose={cancelDownload}
