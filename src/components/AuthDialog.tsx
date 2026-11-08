@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Github } from 'lucide-react'
-import { getSupabase } from '../lib/supabase'
+import { getSupabase, supabase } from '../lib/supabase'
 
 const legalBaseUrl = new URL(import.meta.env.BASE_URL, window.location.origin)
 const termsUrl = import.meta.env.VITE_TERMS_URL || new URL('terminos.html', legalBaseUrl).href
@@ -32,22 +32,67 @@ export default function AuthDialog({ onClose }: Props) {
   const [mode, setMode] = useState<AuthMode>('signin')
   const [acceptedTerms, setAcceptedTerms] = useState(false)
   const [busyProvider, setBusyProvider] = useState<'google' | 'github' | null>(null)
+  const [oauthPending, setOauthPending] = useState(false)
+  const popupRef = useRef<Window | null>(null)
+  const onCloseRef = useRef(onClose)
+  onCloseRef.current = onClose
+
+  useEffect(() => {
+    if (!supabase) return
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event !== 'SIGNED_IN' || !session || !popupRef.current) return
+      popupRef.current.close()
+      popupRef.current = null
+      setOauthPending(false)
+      onCloseRef.current()
+    })
+    const pollId = window.setInterval(() => {
+      if (!popupRef.current?.closed) return
+      popupRef.current = null
+      setOauthPending(false)
+      setMessage('Se cerró la ventana de autenticación antes de terminar.')
+    }, 500)
+
+    return () => {
+      subscription.unsubscribe()
+      window.clearInterval(pollId)
+      popupRef.current?.close()
+      popupRef.current = null
+    }
+  }, [])
 
   const signInWithProvider = async (provider: 'google' | 'github') => {
+    const popup = window.open('', 'fondoselect-oauth', 'popup,width=500,height=650')
+    if (!popup) {
+      setError('El navegador bloqueó la ventana emergente. Permite ventanas emergentes para continuar.')
+      return
+    }
+
+    popupRef.current = popup
+    setOauthPending(true)
     setBusy(true)
     setBusyProvider(provider)
     setError('')
+    setMessage('Completa el acceso en la ventana que se abrió.')
     try {
-      const { error: authError } = await getSupabase().auth.signInWithOAuth({
+      const { data, error: authError } = await getSupabase().auth.signInWithOAuth({
         provider,
         options: {
           redirectTo: `${window.location.origin}${import.meta.env.BASE_URL}`,
+          skipBrowserRedirect: true,
         },
       })
       if (authError) throw authError
+      if (!data.url) throw new Error('Supabase no devolvió la dirección de autenticación.')
+      popup.location.href = data.url
     } catch (authError) {
+      popup.close()
+      popupRef.current = null
+      setOauthPending(false)
       const providerName = provider === 'google' ? 'Google' : 'GitHub'
       setError(authError instanceof Error ? authError.message : `No se pudo iniciar sesión con ${providerName}.`)
+    } finally {
       setBusy(false)
       setBusyProvider(null)
     }
@@ -93,7 +138,7 @@ export default function AuthDialog({ onClose }: Props) {
         <p className="eyebrow">TU CUENTA FONDOSELECT</p>
         <h2 id="account-heading">{mode === 'signin' ? 'Inicia sesión.' : 'Crea tu cuenta.'}</h2>
         <p className="account-description">{mode === 'signin' ? 'Accede para guardar tus packs y gestionar tu plan premium.' : 'Regístrate para guardar tus packs y gestionar tu plan premium.'}</p>
-        <button className="account-provider" onClick={() => void signInWithProvider('google')} disabled={busy || !canAuthenticate}>
+        <button className="account-provider" onClick={() => void signInWithProvider('google')} disabled={busy || oauthPending || !canAuthenticate}>
           <svg width="16" height="16" viewBox="0 0 48 48" aria-hidden="true">
             <path fill="#4285F4" d="M43.6 24.5c0-1.4-.1-2.8-.4-4.1H24v7.8h11a9.4 9.4 0 0 1-4.1 6.2v5.1h6.6c3.9-3.6 6.1-8.8 6.1-15z" />
             <path fill="#34A853" d="M24 44c5.5 0 10.1-1.8 13.5-4.8l-6.6-5.1c-1.8 1.2-4.1 2-6.9 2-5.3 0-9.8-3.6-11.4-8.4H5.8v5.3A20 20 0 0 0 24 44z" />
@@ -102,7 +147,7 @@ export default function AuthDialog({ onClose }: Props) {
           </svg>
           {busyProvider === 'google' ? 'Conectando…' : `${mode === 'signin' ? 'Continuar' : 'Registrarme'} con Google`}
         </button>
-        <button className="account-provider" onClick={() => void signInWithProvider('github')} disabled={busy || !canAuthenticate}>
+        <button className="account-provider" onClick={() => void signInWithProvider('github')} disabled={busy || oauthPending || !canAuthenticate}>
           <Github size={15} aria-hidden="true" />
           {busyProvider === 'github' ? 'Conectando…' : `${mode === 'signin' ? 'Continuar' : 'Registrarme'} con GitHub`}
         </button>
@@ -118,13 +163,13 @@ export default function AuthDialog({ onClose }: Props) {
             onChange={event => setEmail(event.target.value)}
             placeholder="tu@correo.com"
           />
-          <button className="button-primary account-submit" disabled={busy || !canAuthenticate}>
+          <button className="button-primary account-submit" disabled={busy || oauthPending || !canAuthenticate}>
             {busy ? 'Enviando…' : mode === 'signin' ? 'Enviar enlace de acceso' : 'Crear cuenta con correo'}
           </button>
         </form>
         <p className="account-switch">
           {mode === 'signin' ? '¿Aún no tienes cuenta?' : '¿Ya tienes una cuenta?'}
-          {' '}<button type="button" onClick={changeMode} disabled={busy}>
+          {' '}<button type="button" onClick={changeMode} disabled={busy || oauthPending}>
             {mode === 'signin' ? 'Regístrate' : 'Inicia sesión'}
           </button>
         </p>
