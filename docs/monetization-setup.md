@@ -5,7 +5,7 @@ FondoSelect sigue siendo una app estática de GitHub Pages; Supabase aplica la a
 ## 1. Supabase
 
 1. Crea un proyecto Supabase y ejecuta en el SQL Editor, en orden, `supabase/migrations/20261106120000_download_plans.sql` y `supabase/migrations/20261106130000_user_profiles.sql`. Supabase Auth guarda las cuentas; la tabla `profiles` conserva el nombre y avatar de cada proveedor social, con acceso restringido al propio usuario.
-2. En **Authentication → Providers**, habilita Google, GitHub y correo electrónico (OTP/enlace de acceso).
+2. En **Authentication → Settings**, permite que nuevos usuarios se registren. En **Authentication → Providers**, habilita Google, GitHub y correo electrónico (OTP/enlace de acceso). La pantalla de cuenta ofrece inicio de sesión y registro por separado; en ambos exige aceptar los términos y la política de privacidad. El registro por correo envía un enlace de confirmación y los proveedores sociales también pueden crear cuentas.
 3. En **Authentication → URL Configuration**, configura como URL del sitio `https://pascual3123.github.io/FondoSelect/` y añade esa dirección a las URL permitidas de redirección. Para probar en Codespaces, añade también `https://*.app.github.dev/**`.
 4. En Google Cloud crea un cliente OAuth Web. Como URI de redirección autorizada usa `https://<PROJECT_REF>.supabase.co/auth/v1/callback`, y copia el ID y secreto en la configuración del proveedor Google de Supabase.
 5. En GitHub crea un OAuth App. Configura su **Authorization callback URL** con `https://<PROJECT_REF>.supabase.co/auth/v1/callback` y copia el Client ID y Client Secret en la configuración del proveedor GitHub de Supabase.
